@@ -1,6 +1,6 @@
+from hashlib import md5
 import os
 import smtplib
-import psycopg2
 from typing import Final
 from datetime import date
 from dotenv import load_dotenv
@@ -8,7 +8,7 @@ from sqlalchemy.engine.result import Result
 from flask import Flask, abort, render_template, redirect, url_for, flash
 from flask_bootstrap import Bootstrap5
 from flask_ckeditor import CKEditor
-from flask_gravatar import Gravatar
+# from flask_gravatar import Gravatar
 from flask_login import login_user, LoginManager, current_user, logout_user
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -55,16 +55,18 @@ current_user: UserMixin
 def load_user(user_id):
     return db.get_or_404(User, user_id)
 
-
 # For adding profile images to the comment section
-gravatar = Gravatar(app,
-                    size=100,
-                    rating='g',
-                    default='retro',
-                    force_default=False,
-                    force_lower=False,
-                    use_ssl=False,
-                    base_url=None)
+# gravatar = Gravatar(app,
+#                     size=100,
+#                     rating='g',
+#                     default='retro',
+#                     force_default=False,
+#                     force_lower=False,
+#                     use_ssl=False,
+#                     base_url=None)
+
+def gravatar_url(size=100, rating='g', default='retro', force_default=False):
+    return f"https://www.gravatar.com/avatar/?s={size}&d={default}&r={rating}&f={force_default}"
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DB
 db.init_app(app)
@@ -172,7 +174,8 @@ def show_post(post_id):
         )
         db.session.add(new_comment)
         db.session.commit()
-    return render_template("post.html", post=requested_post, current_user=current_user, form=comment_form)
+    gravatar = gravatar_url()
+    return render_template("post.html", post=requested_post, current_user=current_user, form=comment_form, gravatar_link=gravatar)
 
 
 # Use a decorator so only an admin user can create new posts
@@ -195,7 +198,7 @@ def add_new_post():
     return render_template("make-post.html", form=form, current_user=current_user)
 
 
-# Use a decorator so only an admin user can edit a post
+# Use a decorator so only an admin user can edit a post 
 @app.route("/edit-post/<int:post_id>", methods=["GET", "POST"])
 def edit_post(post_id):
     post = db.get_or_404(BlogPost, post_id)
