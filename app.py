@@ -1,4 +1,3 @@
-from hashlib import md5
 import os
 import smtplib
 from typing import Final
@@ -8,12 +7,12 @@ from sqlalchemy.engine.result import Result
 from flask import Flask, abort, render_template, redirect, url_for, flash
 from flask_bootstrap import Bootstrap5
 from flask_ckeditor import CKEditor
-# from flask_gravatar import Gravatar
 from flask_login import login_user, LoginManager, current_user, logout_user
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm, ContactForm
 from models import Comment, BlogPost, User, db, UserMixin
+from flask_migrate import Migrate
 
 load_dotenv()
 
@@ -55,25 +54,12 @@ current_user: UserMixin
 def load_user(user_id):
     return db.get_or_404(User, user_id)
 
-# For adding profile images to the comment section
-# gravatar = Gravatar(app,
-#                     size=100,
-#                     rating='g',
-#                     default='retro',
-#                     force_default=False,
-#                     force_lower=False,
-#                     use_ssl=False,
-#                     base_url=None)
-
 def gravatar_url(size=100, rating='g', default='retro', force_default=False):
     return f"https://www.gravatar.com/avatar/?s={size}&d={default}&r={rating}&f={force_default}"
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DB
+migrate = Migrate(app, db)
 db.init_app(app)
-
-with app.app_context():
-    db.create_all()
-
 
 # Create an admin-only decorator
 def admin_only(f):
