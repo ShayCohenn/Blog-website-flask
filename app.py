@@ -12,7 +12,6 @@ from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm, ContactForm
 from models import Comment, BlogPost, User, db, UserMixin
-from flask_migrate import Migrate
 
 load_dotenv()
 
@@ -58,7 +57,6 @@ def gravatar_url(size=100, rating='g', default='retro', force_default=False):
     return f"https://www.gravatar.com/avatar/?s={size}&d={default}&r={rating}&f={force_default}"
 
 app.config['SQLALCHEMY_DATABASE_URI'] = DB
-migrate = Migrate(app, db)
 db.init_app(app)
 
 # Create an admin-only decorator
@@ -244,4 +242,6 @@ def contact():
 
 
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
     app.run(debug=True) 
