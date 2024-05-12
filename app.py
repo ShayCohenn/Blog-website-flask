@@ -3,6 +3,7 @@ import smtplib
 from typing import Final
 from datetime import date
 from dotenv import load_dotenv
+from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.engine.result import Result
 from flask import Flask, abort, render_template, redirect, url_for, flash
 from flask_bootstrap import Bootstrap5
@@ -11,7 +12,9 @@ from flask_login import login_user, LoginManager, current_user, logout_user
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm, ContactForm
-from models import Comment, BlogPost, User, db, UserMixin
+from sqlalchemy import Integer, String, Text
+from sqlalchemy.orm import relationship, DeclarativeBase, Mapped, mapped_column
+from flask_login import UserMixin
 
 load_dotenv()
 
@@ -21,6 +24,60 @@ SECRET_KEY: Final[str] = os.getenv('SECRET_KEY')
 FROM_EMAIL: Final[str] = os.getenv('FROM_EMAIL')
 PASSWORD: Final[str] = os.getenv('PASSWORD')
 TO_EMAIL: Final[str] = os.getenv('TO_EMAIL')
+
+app: Flask = Flask(__name__)
+app.config['SECRET_KEY'] = SECRET_KEY
+ckeditor = CKEditor(app)
+Bootstrap5(app)
+
+# Configure Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+current_user: UserMixin
+
+class Base(DeclarativeBase):
+    __abstract__ = True
+db: SQLAlchemy = SQLAlchemy()
+
+app.config['SQLALCHEMY_DATABASE_URI'] = DB
+db.init_app(app)
+
+class BlogPost(db.Model):
+    __tablename__ = "blog_posts"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    author_id: Mapped[int] = mapped_column(Integer, db.ForeignKey("users.id"))
+    author = relationship("User", back_populates="posts")
+    title: Mapped[str] = mapped_column(String(250), unique=True, nullable=False)
+    subtitle: Mapped[str] = mapped_column(String(250), nullable=False)
+    date: Mapped[str] = mapped_column(String(250), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    img_url: Mapped[str] = mapped_column(String(250), nullable=False)
+    comments = relationship("Comment", back_populates="parent_post", cascade="all, delete-orphan")
+
+class User(UserMixin, db.Model):
+    __tablename__ = "users"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    email: Mapped[str] = mapped_column(String(100), unique=True)
+    password: Mapped[str] = mapped_column(String(100))
+    name: Mapped[str] = mapped_column(String(100))
+    posts = relationship("BlogPost", back_populates="author")
+    comments = relationship("Comment", back_populates="comment_author")
+
+class Comment(db.Model):
+    __tablename__ = "comments"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    author_id: Mapped[int] = mapped_column(Integer, db.ForeignKey("users.id"))
+    comment_author = relationship("User", back_populates="comments")
+    post_id: Mapped[str] = mapped_column(Integer, db.ForeignKey("blog_posts.id"))
+    parent_post = relationship("BlogPost", back_populates="comments")
+
+@login_manager.user_loader
+def load_user(user_id):
+    return db.get_or_404(User, user_id)
+
+def gravatar_url(size=100, rating='g', default='retro', force_default=False):
+    return f"https://www.gravatar.com/avatar/?s={size}&d={default}&r={rating}&f={force_default}"
 
 def send_email(message: str) -> None:
      with smtplib.SMTP("smtp.gmail.com") as connection:
@@ -38,26 +95,6 @@ def construct_msg(name: str, email: str, phone_number: str, msg: str) -> str:
                         message: {msg}"""
     return message
 
-app: Flask = Flask(__name__)
-app.config['SECRET_KEY'] = SECRET_KEY
-ckeditor = CKEditor(app)
-Bootstrap5(app)
-
-# Configure Flask-Login
-login_manager = LoginManager()
-login_manager.init_app(app)
-current_user: UserMixin
-
-
-@login_manager.user_loader
-def load_user(user_id):
-    return db.get_or_404(User, user_id)
-
-def gravatar_url(size=100, rating='g', default='retro', force_default=False):
-    return f"https://www.gravatar.com/avatar/?s={size}&d={default}&r={rating}&f={force_default}"
-
-app.config['SQLALCHEMY_DATABASE_URI'] = DB
-db.init_app(app)
 
 # Create an admin-only decorator
 def admin_only(f):
@@ -242,6 +279,6 @@ def contact():
 
 
 if __name__ == "__main__":
-    # with app.app_context():
-    #     db.create_all()
+    with app.app_context():
+        db.create_all()
     app.run(debug=True) 
